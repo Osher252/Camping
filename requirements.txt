@@ -1,0 +1,2 @@
+# No external dependencies — uses only Python stdlib (urllib, json, dataclasses).
+# Python 3.10+ required (for `X | None` syntax, walrus in match, etc.)

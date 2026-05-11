@@ -1,0 +1,44 @@
+name: Daily camping forecast
+
+on:
+  schedule:
+    # 06:00 UTC daily — gets the latest 00Z ECMWF run, before most of UK is awake
+    - cron: "0 6 * * *"
+  workflow_dispatch:  # allow manual runs from the Actions tab
+
+permissions:
+  contents: write  # needed to commit updated state.json
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run forecast
+        env:
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          CC_EMAIL: ${{ secrets.CC_EMAIL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+        run: |
+          cd ${{ github.workspace }}
+          python main.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json
+          if git diff --staged --quiet; then
+            echo "No state changes to commit."
+          else
+            git commit -m "chore: update forecast state $(date -u +%Y-%m-%d)"
+            git push
+          fi
