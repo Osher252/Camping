@@ -216,20 +216,35 @@ def _render_site_section(
 
 
 def _render_strip(scores: list) -> str:
-    """Render the 14-day mini bar strip — one cell per day, coloured by probability."""
+    """Render the 14-day mini bar strip — one cell per day, coloured by probability.
+
+    Uses a fixed-layout table (not flexbox) so it renders consistently across
+    every email client. Inline styles only — Gmail/Apple Mail strip many <style>
+    block rules but always honour inline.
+    """
     cells = []
+    n = max(len(scores[:14]), 1)
+    cell_width_pct = 100 / n
     for s in scores[:14]:
         d = date.fromisoformat(s.date)
         p = s.p_campable
         color = _prob_color(p)
         cells.append(
-            f'<div class="day" style="background:{color};">'
-            f'<div class="dow">{d.strftime("%a")}</div>'
+            f'<td style="background:{color};color:#fff;text-align:center;'
+            f'padding:6px 2px;border-radius:3px;font-size:10px;'
+            f'width:{cell_width_pct:.4f}%;vertical-align:top;">'
+            f'<div style="font-weight:bold;">{d.strftime("%a")}</div>'
             f'<div>{d.day}</div>'
-            f'<div class="pct">{int(p*100)}%</div>'
-            f'</div>'
+            f'<div style="font-size:9px;opacity:0.9;">{int(p*100)}%</div>'
+            f'</td>'
         )
-    return f'<div class="strip">{"".join(cells)}</div>'
+    return (
+        f'<table cellpadding="0" cellspacing="2" border="0" '
+        f'style="width:100%;table-layout:fixed;margin:12px 0;'
+        f'border-collapse:separate;border-spacing:2px;">'
+        f'<tr>{"".join(cells)}</tr>'
+        f'</table>'
+    )
 
 
 def _prob_color(p: float) -> str:
