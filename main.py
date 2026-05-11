@@ -38,6 +38,12 @@ SITES = {
         "lon": 0.0040,
         "region": "Sheffield Park, East Sussex",
     },
+    "burnbake": {
+        "name": "Burnbake Campsite",
+        "lat": 50.6585,
+        "lon": -2.0335,
+        "region": "Isle of Purbeck, Dorset",
+    },
 }
 
 # Comfort thresholds — calibrated for camping with young kids
