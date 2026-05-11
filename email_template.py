@@ -327,7 +327,11 @@ def send_email(to_addr: str, subject: str, html: str, cc_addr: Optional[str] = N
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        result = json.loads(resp.read().decode("utf-8"))
-        if "id" not in result:
-            raise RuntimeError(f"Resend error: {result}")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            if "id" not in result:
+                raise RuntimeError(f"Resend error: {result}")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Resend HTTP {e.code}: {body}") from e
