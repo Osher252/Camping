@@ -324,6 +324,7 @@ def send_email(to_addr: str, subject: str, html: str, cc_addr: Optional[str] = N
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
+            "User-Agent": "camping-forecast/1.0 (+github.com/Osher252/Camping)",
         },
         method="POST",
     )
