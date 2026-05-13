@@ -416,9 +416,14 @@ def run() -> int:
     if not should_email:
         state["consecutive_skips"] = prior_skips + 1
         save_state(state)
+        remaining = MAX_CONSECUTIVE_SKIPS - state["consecutive_skips"]
+        if remaining > 0:
+            tail = f"{remaining} more silent day(s) before a heartbeat email fires."
+        else:
+            tail = "next silent run will trigger a heartbeat email."
         print(f"\nNo alerts and no status digest due — skipping email "
               f"(silent day {state['consecutive_skips']}/{MAX_CONSECUTIVE_SKIPS}; "
-              f"next silent day will trigger a heartbeat email).")
+              f"{tail})")
         return 0
 
     # We're going to send — reset the skip counter, then save.
