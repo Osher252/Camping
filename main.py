@@ -58,6 +58,10 @@ ORGANIZE_PROB_MIN = 0.50      # day 5-7: start organizing things
 COMMIT_PROB_MIN = 0.70        # day 1-4: book the site
 COMMIT_STABILITY_RUNS = 2     # window must have held across this many prior runs
 
+# Heartbeat — after this many silent days in a row (no alert, not Monday),
+# force a status email so the user knows the script is still running.
+MAX_CONSECUTIVE_SKIPS = 3
+
 # State retention — how many past forecast runs to keep for stability tracking
 STATE_RETENTION_RUNS = 7
 
@@ -389,9 +393,9 @@ def run() -> int:
         print("No site data fetched — aborting.")
         return 1
 
-    # Update state BEFORE computing stability, so today's run is included
+    # Update state BEFORE computing stability, so today's run is included.
+    # We save at the end so the consecutive-skips counter is included too.
     state = update_state(state, run_date, per_site_scores)
-    save_state(state)
 
     # Decide alert per site
     alerts: dict[str, tuple[Window, str, int]] = {}
@@ -404,12 +408,25 @@ def run() -> int:
                   f"{w.start} ({w.nights}n) | P={w.joint_prob:.0%} | "
                   f"held in {stab} prior runs")
 
-    # Decide whether to email
-    should_email = bool(alerts) or _send_status_digest_today()
+    # Decide whether to email — heartbeat forces a send after too many silent days
+    prior_skips = state.get("consecutive_skips", 0)
+    heartbeat = prior_skips >= MAX_CONSECUTIVE_SKIPS
+    should_email = bool(alerts) or _send_status_digest_today() or heartbeat
 
     if not should_email:
-        print("\nNo alerts and no status digest due — skipping email.")
+        state["consecutive_skips"] = prior_skips + 1
+        save_state(state)
+        print(f"\nNo alerts and no status digest due — skipping email "
+              f"(silent day {state['consecutive_skips']}/{MAX_CONSECUTIVE_SKIPS}; "
+              f"next silent day will trigger a heartbeat email).")
         return 0
+
+    # We're going to send — reset the skip counter, then save.
+    if heartbeat and not alerts and not _send_status_digest_today():
+        print(f"\nHeartbeat: {prior_skips} silent days in a row — "
+              f"sending status check-in even though nothing is alert-worthy.")
+    state["consecutive_skips"] = 0
+    save_state(state)
 
     html, subject = render_email(
         sites=SITES,
