@@ -148,14 +148,22 @@ def aggregate_to_days(ens: EnsembleData) -> dict[str, dict[int, dict]]:
             if not day_idxs or not overnight_idxs or not precip_idxs:
                 continue
 
-            day_max = max(temps[i] for i in day_idxs if temps[i] is not None)
-            overnight_min = min(temps[i] for i in overnight_idxs if temps[i] is not None)
-            precip_total = sum(precs[i] for i in precip_idxs if precs[i] is not None)
+            # Filter Nones explicitly so we can detect "this member has gaps
+            # for this day" (Open-Meteo occasionally returns null for some
+            # ensemble members at the far end of the forecast horizon).
+            day_temps = [temps[i] for i in day_idxs if temps[i] is not None]
+            overnight_temps = [temps[i] for i in overnight_idxs if temps[i] is not None]
+            precip_values = [precs[i] for i in precip_idxs if precs[i] is not None]
+
+            # If this member has missing data for this day, skip just this
+            # member-day — other members can still contribute to the score.
+            if not day_temps or not overnight_temps or not precip_values:
+                continue
 
             out[date_str][m] = {
-                "day_max": day_max,
-                "overnight_min": overnight_min,
-                "precip": precip_total,
+                "day_max": max(day_temps),
+                "overnight_min": min(overnight_temps),
+                "precip": sum(precip_values),
             }
 
     return out
