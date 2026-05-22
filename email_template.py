@@ -138,9 +138,10 @@ def render_email(
 {site_sections}
 
 <div class="footer">
+  ☀ = daytime high &nbsp;·&nbsp; 🌙 = overnight low &nbsp;·&nbsp; % = chance the day is comfortable<br>
   Run {run_date} · ECMWF IFS 51-member ensemble (Open-Meteo) ·
-  Thresholds: day max ≥{17}°C, overnight min ≥{11}°C, precip &lt;{2}mm ·
-  Min 2 consecutive nights
+  Comfortable means: daytime high ≥{17}°C, overnight low ≥{11}°C, rain under {2}mm ·
+  Looking for 1–2 night trips
 </div>
 
 </body>
@@ -163,6 +164,8 @@ def _fmt_window_dates(window) -> str:
     """Format e.g. '2026-05-18→2026-05-20' as 'Mon 18 → Wed 20 May'."""
     start = date.fromisoformat(window.start)
     end = date.fromisoformat(window.end)
+    if start == end:
+        return start.strftime("%a %d %b")
     if start.month == end.month:
         return f"{start.strftime('%a %d')} → {end.strftime('%a %d %b')}"
     return f"{start.strftime('%a %d %b')} → {end.strftime('%a %d %b')}"
@@ -196,8 +199,9 @@ def _render_site_section(
         win_block = f"""
 <div class="window">
   <strong>Best candidate: {_fmt_window_dates(best)}</strong>
-  &nbsp;·&nbsp; {best.nights}n &nbsp;·&nbsp; {best.joint_prob:.0%}
-  &nbsp;·&nbsp; in {best.days_ahead}d
+  &nbsp;·&nbsp; {best.nights} night{'s' if best.nights > 1 else ''} &nbsp;·&nbsp; {best.joint_prob:.0%}
+  &nbsp;·&nbsp; in {best.days_ahead} day{'s' if best.days_ahead != 1 else ''}
+  {_render_window_detail(best, scores)}
   <div class="stability">Below alert threshold — keep watching.</div>
 </div>"""
     else:
@@ -229,6 +233,8 @@ def _render_strip(scores: list) -> str:
         d = date.fromisoformat(s.date)
         p = s.p_campable
         color = _prob_color(p)
+        day_t = round(s.p50_day_max)
+        night_t = round(s.p50_overnight_min)
         cells.append(
             f'<td style="background:{color};color:#fff;text-align:center;'
             f'padding:6px 2px;border-radius:3px;font-size:10px;'
@@ -236,6 +242,8 @@ def _render_strip(scores: list) -> str:
             f'<div style="font-weight:bold;">{d.strftime("%a")}</div>'
             f'<div>{d.day}</div>'
             f'<div style="font-size:9px;opacity:0.9;">{int(p*100)}%</div>'
+            f'<div style="font-size:9px;margin-top:3px;">☀ {day_t}°</div>'
+            f'<div style="font-size:9px;">🌙 {night_t}°</div>'
             f'</td>'
         )
     return (

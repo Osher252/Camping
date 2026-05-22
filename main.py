@@ -50,8 +50,8 @@ SITES = {
 DAY_MAX_MIN_C = 17.0          # daytime warmth (kids running around)
 OVERNIGHT_MIN_MIN_C = 11.0    # overnight comfort (fire-side, sleeping)
 PRECIP_MAX_MM = 2.0           # daily total
-MIN_WINDOW_NIGHTS = 2         # need at least 2 consecutive days
-MAX_WINDOW_NIGHTS = 4         # longest trip we'd score as one window (long weekend)
+MIN_WINDOW_NIGHTS = 1         # a single good night is enough
+MAX_WINDOW_NIGHTS = 2         # only care about 1-2 night trips
 
 # Alert cascade — confidence thresholds at each stage
 WATCH_PROB_MIN = 0.30         # day 8-14: a window may be forming
