@@ -51,6 +51,7 @@ DAY_MAX_MIN_C = 17.0          # daytime warmth (kids running around)
 OVERNIGHT_MIN_MIN_C = 11.0    # overnight comfort (fire-side, sleeping)
 PRECIP_MAX_MM = 2.0           # daily total
 MIN_WINDOW_NIGHTS = 2         # need at least 2 consecutive days
+MAX_WINDOW_NIGHTS = 4         # longest trip we'd score as one window (long weekend)
 
 # Alert cascade — confidence thresholds at each stage
 WATCH_PROB_MIN = 0.30         # day 8-14: a window may be forming
@@ -209,9 +210,15 @@ def find_windows(
     today: date,
 ) -> list[Window]:
     """
-    Find consecutive runs of ≥MIN_WINDOW_NIGHTS days where each day's
-    campability is at least WATCH_PROB_MIN. Compute joint probability
-    (fraction of members where ALL days in window are campable).
+    Find good-weather runs (consecutive days each ≥WATCH_PROB_MIN), and within
+    each run report the best bookable window of MIN_WINDOW_NIGHTS..MAX_WINDOW_NIGHTS.
+
+    Joint probability = fraction of ensemble members campable on EVERY day of the
+    window. Crucially we only compute this over a realistic trip length, not the
+    whole run: requiring all 14 days of a long good spell to land for a single
+    member drives the joint probability to near zero even when each individual
+    day is 80-100% likely. Sliding a 2-4 night window fixes that — a great
+    weekend now reads as a high-confidence window instead of "no windows".
     """
     # Index members per day
     sorted_dates = sorted(per_day.keys())
@@ -226,6 +233,12 @@ def find_windows(
             and d["overnight_min"] >= OVERNIGHT_MIN_MIN_C
             and d["precip"] < PRECIP_MAX_MM
         )
+
+    def joint_prob(window_dates: list[str]) -> float:
+        return sum(
+            1 for m in range(n_members)
+            if all(is_member_campable(d, m) for d in window_dates)
+        ) / max(n_members, 1)
 
     score_by_date = {s.date: s for s in scores}
     windows: list[Window] = []
@@ -244,23 +257,32 @@ def find_windows(
         ):
             j += 1
 
-        run_len = j - i + 1
-        if run_len >= MIN_WINDOW_NIGHTS:
-            run_dates = sorted_dates[i:j + 1]
-            # Joint prob: fraction of members campable on ALL days of run
-            joint = sum(
-                1 for m in range(n_members)
-                if all(is_member_campable(d, m) for d in run_dates)
-            ) / max(n_members, 1)
-
-            start_date = date.fromisoformat(run_dates[0])
-            windows.append(Window(
-                start=run_dates[0],
-                end=run_dates[-1],
-                nights=run_len,
-                joint_prob=joint,
-                days_ahead=(start_date - today).days,
-            ))
+        run_dates = sorted_dates[i:j + 1]
+        if len(run_dates) >= MIN_WINDOW_NIGHTS:
+            # Slide trip-length windows across this run and keep the most
+            # confident. Tie-break: prefer longer trips, then earlier starts.
+            best: Window | None = None
+            max_len = min(MAX_WINDOW_NIGHTS, len(run_dates))
+            for length in range(MIN_WINDOW_NIGHTS, max_len + 1):
+                for k in range(len(run_dates) - length + 1):
+                    sub = run_dates[k:k + length]
+                    start_date = date.fromisoformat(sub[0])
+                    cand = Window(
+                        start=sub[0],
+                        end=sub[-1],
+                        nights=length,
+                        joint_prob=joint_prob(sub),
+                        days_ahead=(start_date - today).days,
+                    )
+                    key = (cand.joint_prob, cand.nights, -cand.days_ahead)
+                    best_key = (
+                        (best.joint_prob, best.nights, -best.days_ahead)
+                        if best else (-1.0, -1, -10**9)
+                    )
+                    if key > best_key:
+                        best = cand
+            if best:
+                windows.append(best)
         i = j + 1
 
     return windows
